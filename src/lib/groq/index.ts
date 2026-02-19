@@ -2,9 +2,14 @@ import Groq from 'groq-sdk';
 import { z } from 'zod';
 import type { QuoteRequest, QuoteResponse } from '@/lib/pricing';
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+/** Lazy client to avoid requiring GROQ_API_KEY at build time (e.g. Vercel). */
+function getGroqClient(): Groq {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    throw new Error('GROQ_API_KEY is not set');
+  }
+  return new Groq({ apiKey });
+}
 
 const groqQuoteResponseSchema = z.object({
   basePrice: z.number().min(0),
@@ -33,7 +38,7 @@ export async function estimateVolumeFromImage(
   analysis: string;
 }> {
   try {
-    const completion = await groq.chat.completions.create({
+    const completion = await getGroqClient().chat.completions.create({
       model: 'llama-3.1-8b-instant',
       max_tokens: 1024,
       messages: [
@@ -69,7 +74,7 @@ export async function estimateVolumeFromDescription(
   itemBreakdown: Record<string, number>;
 }> {
   try {
-    const completion = await groq.chat.completions.create({
+    const completion = await getGroqClient().chat.completions.create({
       model: 'llama-3.1-8b-instant',
       max_tokens: 1024,
       messages: [
@@ -145,7 +150,7 @@ Respond with a single JSON object only, no markdown or extra text. Schema:
   }
 }`;
 
-  const completion = await groq.chat.completions.create({
+  const completion = await getGroqClient().chat.completions.create({
     model: 'llama-3.1-8b-instant',
     max_tokens: 1024,
     messages: [{ role: 'user', content: prompt }],
