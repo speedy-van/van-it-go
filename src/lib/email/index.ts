@@ -1,6 +1,11 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+/** Lazy Resend client so build (no env) does not throw. Instantiated only when sending. */
+function getResend(): Resend | null {
+  const key = process.env.RESEND_API_KEY;
+  if (!key || key.trim() === '') return null;
+  return new Resend(key);
+}
 
 const SUPPORT_EMAIL = 'support@speedy-van.co.uk';
 const SUPPORT_PHONE = '01202 129746';
@@ -15,6 +20,12 @@ export async function sendEmail({
   subject: string;
   html: string;
 }) {
+  const resend = getResend();
+  if (!resend) {
+    throw new Error(
+      'Email is not configured. Add RESEND_API_KEY to your environment (e.g. .env.local or Vercel).'
+    );
+  }
   try {
     const response = await resend.emails.send({
       from: process.env.EMAIL_FROM ?? 'noreply@vanitgo.com',
