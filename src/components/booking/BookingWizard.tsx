@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Box,
   Container,
@@ -94,7 +95,12 @@ const steps = [
   { number: 7, title: 'Confirmation' },
 ];
 
+const MILES_TO_KM = 1.60934;
+
 export function BookingWizard() {
+  const searchParams = useSearchParams();
+  const quoteId = searchParams.get('quoteId');
+
   const [currentStep, setCurrentStep] = useState(1);
   const [bookingData, setBookingData] = useState<BookingData>({
     itemCount: 1,
@@ -106,6 +112,46 @@ export function BookingWizard() {
   const handleStepChange = useCallback((data: Partial<BookingData>) => {
     setBookingData((prev) => ({ ...prev, ...data }));
   }, []);
+
+  // Prefill from homepage quote widget (e.g. /book?quoteId=xxx)
+  useEffect(() => {
+    if (!quoteId) return;
+    let cancelled = false;
+    fetch(`/api/quote/${encodeURIComponent(quoteId)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled || !data.success || !data.quote) return;
+        const q = data.quote;
+        const distanceKm = (q.distanceMiles ?? 0) * MILES_TO_KM;
+        setBookingData((prev) => ({
+          ...prev,
+          pickupAddress: q.fromAddress ?? q.fromPostcode,
+          pickupLat: q.pickupLat,
+          pickupLng: q.pickupLng,
+          dropoffAddress: q.toAddress ?? q.toPostcode,
+          dropoffLat: q.dropoffLat,
+          dropoffLng: q.dropoffLng,
+          moveSize: q.moveSize ?? 'medium',
+          volumeCubicMeters: q.volumeCubicMeters ?? 10,
+          serviceType: 'house_move',
+          itemCount: 5,
+          quotePrice: q.priceGBP,
+        }));
+        setQuote({
+          distanceKm,
+          estimatedDuration: q.etaMinutes ?? 0,
+          basePrice: 0,
+          distancePrice: 0,
+          volumePrice: 0,
+          totalPrice: q.priceGBP ?? 0,
+          currency: 'GBP',
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [quoteId]);
 
   // Fetch quote when we have addresses + volume + service type (after step 2)
   useEffect(() => {

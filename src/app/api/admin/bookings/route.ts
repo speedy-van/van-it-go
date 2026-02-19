@@ -3,6 +3,8 @@ import { db } from '@/server/db';
 import { bookings } from '@/server/db/schema';
 import { desc, and, gte, lte } from 'drizzle-orm';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/admin/bookings – list all bookings (admin). Optional fromDate, toDate (ISO).
  */

@@ -235,6 +235,25 @@ export const sessions = pgTable(
   }
 );
 
+// Quotes table (homepage widget: store quote for /book?quoteId=xxx)
+export const quotes = pgTable('quotes', {
+  id: varchar('id', { length: 36 }).primaryKey(),
+  fromPostcode: varchar('from_postcode', { length: 20 }).notNull(),
+  toPostcode: varchar('to_postcode', { length: 20 }).notNull(),
+  moveSize: varchar('move_size', { length: 20 }).notNull(),
+  fromAddress: varchar('from_address', { length: 500 }),
+  toAddress: varchar('to_address', { length: 500 }),
+  pickupLat: decimal('pickup_lat', { precision: 10, scale: 8 }).notNull(),
+  pickupLng: decimal('pickup_lng', { precision: 11, scale: 8 }).notNull(),
+  dropoffLat: decimal('dropoff_lat', { precision: 10, scale: 8 }).notNull(),
+  dropoffLng: decimal('dropoff_lng', { precision: 11, scale: 8 }).notNull(),
+  priceGbp: decimal('price_gbp', { precision: 10, scale: 2 }).notNull(),
+  distanceMiles: decimal('distance_miles', { precision: 8, scale: 2 }).notNull(),
+  etaMinutes: integer('eta_minutes').notNull(),
+  volumeCubicMeters: decimal('volume_cubic_meters', { precision: 6, scale: 2 }).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 // Password reset tokens (for forgot-password flow; any role: admin, driver, customer)
 export const passwordResetTokens = pgTable(
   'password_reset_tokens',

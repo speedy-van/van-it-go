@@ -14,6 +14,8 @@ import {
   lte,
 } from 'drizzle-orm';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/admin/stats
  * Query: fromDate (ISO), toDate (ISO) – optional date range for bookings/revenue

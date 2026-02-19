@@ -3,6 +3,8 @@ import { db } from '@/server/db';
 import { payments, bookings, users } from '@/server/db/schema';
 import { eq, desc, and, gte, lte } from 'drizzle-orm';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/admin/invoices – list payments (invoices) with booking and customer info
  * Query: fromDate, toDate (optional)
