@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import {
   Box,
   Container,
@@ -12,29 +12,104 @@ import {
   FormControl,
   FormLabel,
   Input,
+  List,
+  ListItem,
   Radio,
   RadioGroup,
   Stack,
   useToast,
 } from '@chakra-ui/react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 type MoveSize = 'small' | 'medium' | 'large';
 
-interface WidgetResult {
-  quoteId: string;
-  priceGBP: number;
-  distanceMiles: number;
-  etaMinutes: number;
+interface GeocodeSuggestion {
+  address: string;
+  text: string;
+  latitude: number;
+  longitude: number;
+  countryCode?: string | null;
 }
 
+const GEOCODE_DEBOUNCE_MS = 300;
+const MIN_CHARS_FOR_SEARCH = 3;
+
 export function QuoteWidget() {
+  const router = useRouter();
   const [fromPostcode, setFromPostcode] = useState('');
   const [toPostcode, setToPostcode] = useState('');
+  const [fromSuggestions, setFromSuggestions] = useState<GeocodeSuggestion[]>([]);
+  const [toSuggestions, setToSuggestions] = useState<GeocodeSuggestion[]>([]);
   const [moveSize, setMoveSize] = useState<MoveSize>('medium');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<WidgetResult | null>(null);
   const toast = useToast();
+  const fromDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchSuggestions = useCallback(async (query: string, isFrom: boolean) => {
+    if (query.length < MIN_CHARS_FOR_SEARCH) {
+      if (isFrom) setFromSuggestions([]);
+      else setToSuggestions([]);
+      return;
+    }
+    try {
+      const res = await fetch('/api/geocode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address: query, limit: 5 }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const list = data.results ?? [];
+      if (isFrom) setFromSuggestions(list);
+      else setToSuggestions(list);
+    } catch {
+      if (isFrom) setFromSuggestions([]);
+      else setToSuggestions([]);
+    }
+  }, []);
+
+  const scheduleGeocode = useCallback(
+    (value: string, isFrom: boolean) => {
+      const ref = isFrom ? fromDebounceRef : toDebounceRef;
+      if (ref.current) clearTimeout(ref.current);
+      if (value.trim().length < MIN_CHARS_FOR_SEARCH) {
+        if (isFrom) setFromSuggestions([]);
+        else setToSuggestions([]);
+        return;
+      }
+      ref.current = setTimeout(() => fetchSuggestions(value.trim(), isFrom), GEOCODE_DEBOUNCE_MS);
+    },
+    [fetchSuggestions]
+  );
+
+  const selectFrom = useCallback((suggestion: GeocodeSuggestion) => {
+    if (suggestion.countryCode && suggestion.countryCode !== 'GB') {
+      toast({
+        title: 'UK addresses only',
+        description: 'Please select an address in the United Kingdom.',
+        status: 'error',
+        isClosable: true,
+      });
+      return;
+    }
+    setFromPostcode(suggestion.address);
+    setFromSuggestions([]);
+  }, [toast]);
+
+  const selectTo = useCallback((suggestion: GeocodeSuggestion) => {
+    if (suggestion.countryCode && suggestion.countryCode !== 'GB') {
+      toast({
+        title: 'UK addresses only',
+        description: 'Please select an address in the United Kingdom.',
+        status: 'error',
+        isClosable: true,
+      });
+      return;
+    }
+    setToPostcode(suggestion.address);
+    setToSuggestions([]);
+  }, [toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,7 +120,6 @@ export function QuoteWidget() {
       return;
     }
     setLoading(true);
-    setResult(null);
     try {
       const res = await fetch('/api/quote/widget', {
         method: 'POST',
@@ -66,12 +140,14 @@ export function QuoteWidget() {
         return;
       }
       if (data.success && data.quoteId) {
-        setResult({
-          quoteId: data.quoteId,
-          priceGBP: data.priceGBP,
-          distanceMiles: data.distanceMiles,
-          etaMinutes: data.etaMinutes,
+        toast({
+          title: 'Quote ready',
+          description: `£${data.priceGBP?.toFixed(2) ?? '0.00'} — taking you to book`,
+          status: 'success',
+          duration: 2000,
+          isClosable: true,
         });
+        router.push(`/book?quoteId=${encodeURIComponent(data.quoteId)}`);
       }
     } catch {
       toast({
@@ -118,31 +194,131 @@ export function QuoteWidget() {
           >
             <VStack spacing={5} align="stretch">
               <HStack spacing={4} align="flex-start" flexWrap="wrap">
-                <FormControl isRequired flex="1" minW="140px">
+                <FormControl isRequired flex="1" minW="140px" position="relative">
                   <FormLabel color="#EBF1FF">From postcode</FormLabel>
                   <Input
+                    id="quote-from-postcode"
                     value={fromPostcode}
-                    onChange={(e) => setFromPostcode(e.target.value)}
+                    onChange={(e) => {
+                      setFromPostcode(e.target.value);
+                      scheduleGeocode(e.target.value, true);
+                    }}
+                    onBlur={() => {
+                      fromDebounceRef.current && clearTimeout(fromDebounceRef.current);
+                      setTimeout(() => setFromSuggestions([]), 200);
+                    }}
                     placeholder="e.g. SW1A 1AA"
                     bg="#06061A"
                     borderColor="rgba(123, 47, 255, 0.4)"
                     color="#F0EFFF"
                     _placeholder={{ color: 'gray.500' }}
-                    maxLength={20}
+                    maxLength={120}
+                    aria-autocomplete="list"
+                    aria-expanded={fromSuggestions.length > 0}
+                    aria-controls="from-suggestions"
+                    aria-activedescendant={undefined}
                   />
+                  {fromSuggestions.length > 0 && (
+                    <List
+                      id="from-suggestions"
+                      position="absolute"
+                      top="100%"
+                      left={0}
+                      right={0}
+                      mt={1}
+                      py={1}
+                      bg="#0F0F2A"
+                      borderRadius="md"
+                      borderWidth="1px"
+                      borderColor="rgba(123, 47, 255, 0.4)"
+                      boxShadow="lg"
+                      zIndex={10}
+                      role="listbox"
+                    >
+                      {fromSuggestions.map((s, i) => (
+                        <ListItem
+                          key={`${s.address}-${i}`}
+                          px={3}
+                          py={2}
+                          cursor="pointer"
+                          role="option"
+                          borderBottomWidth={i < fromSuggestions.length - 1 ? '1px' : 0}
+                          borderColor="rgba(123, 47, 255, 0.2)"
+                          _hover={{ bg: 'rgba(123, 47, 255, 0.15)' }}
+                          _focus={{ bg: 'rgba(123, 47, 255, 0.15)' }}
+                          onClick={() => selectFrom(s)}
+                          onMouseDown={(e) => e.preventDefault()}
+                        >
+                          <Text fontSize="sm" color="#F0EFFF" noOfLines={2}>
+                            {s.address}
+                          </Text>
+                        </ListItem>
+                      ))}
+                    </List>
+                  )}
                 </FormControl>
-                <FormControl isRequired flex="1" minW="140px">
+                <FormControl isRequired flex="1" minW="140px" position="relative">
                   <FormLabel color="#EBF1FF">To postcode</FormLabel>
                   <Input
+                    id="quote-to-postcode"
                     value={toPostcode}
-                    onChange={(e) => setToPostcode(e.target.value)}
+                    onChange={(e) => {
+                      setToPostcode(e.target.value);
+                      scheduleGeocode(e.target.value, false);
+                    }}
+                    onBlur={() => {
+                      toDebounceRef.current && clearTimeout(toDebounceRef.current);
+                      setTimeout(() => setToSuggestions([]), 200);
+                    }}
                     placeholder="e.g. M1 1AD"
                     bg="#06061A"
                     borderColor="rgba(123, 47, 255, 0.4)"
                     color="#F0EFFF"
                     _placeholder={{ color: 'gray.500' }}
-                    maxLength={20}
+                    maxLength={120}
+                    aria-autocomplete="list"
+                    aria-expanded={toSuggestions.length > 0}
+                    aria-controls="to-suggestions"
+                    aria-activedescendant={undefined}
                   />
+                  {toSuggestions.length > 0 && (
+                    <List
+                      id="to-suggestions"
+                      position="absolute"
+                      top="100%"
+                      left={0}
+                      right={0}
+                      mt={1}
+                      py={1}
+                      bg="#0F0F2A"
+                      borderRadius="md"
+                      borderWidth="1px"
+                      borderColor="rgba(123, 47, 255, 0.4)"
+                      boxShadow="lg"
+                      zIndex={10}
+                      role="listbox"
+                    >
+                      {toSuggestions.map((s, i) => (
+                        <ListItem
+                          key={`${s.address}-${i}`}
+                          px={3}
+                          py={2}
+                          cursor="pointer"
+                          role="option"
+                          borderBottomWidth={i < toSuggestions.length - 1 ? '1px' : 0}
+                          borderColor="rgba(123, 47, 255, 0.2)"
+                          _hover={{ bg: 'rgba(123, 47, 255, 0.15)' }}
+                          _focus={{ bg: 'rgba(123, 47, 255, 0.15)' }}
+                          onClick={() => selectTo(s)}
+                          onMouseDown={(e) => e.preventDefault()}
+                        >
+                          <Text fontSize="sm" color="#F0EFFF" noOfLines={2}>
+                            {s.address}
+                          </Text>
+                        </ListItem>
+                      ))}
+                    </List>
+                  )}
                 </FormControl>
               </HStack>
 
@@ -183,41 +359,6 @@ export function QuoteWidget() {
             </VStack>
           </Box>
 
-          {result && (
-            <Box
-              p={6}
-              bg="rgba(123, 47, 255, 0.15)"
-              borderRadius="lg"
-              borderWidth="1px"
-              borderColor="rgba(123, 47, 255, 0.4)"
-              w="full"
-              textAlign="center"
-            >
-              <VStack spacing={3}>
-                <Text color="#EBF1FF" fontSize="lg">
-                  Your estimated price
-                </Text>
-                <Heading size="xl" color="#FFB800">
-                  £{result.priceGBP.toFixed(2)}
-                </Heading>
-                <Text color="#EBF1FF" fontSize="sm">
-                  {result.distanceMiles.toFixed(1)} miles · ~{result.etaMinutes} min
-                </Text>
-                <Link href={`/book?quoteId=${encodeURIComponent(result.quoteId)}`} passHref legacyBehavior>
-                  <Button
-                    as="a"
-                    size="lg"
-                    bg="#7B2FFF"
-                    color="white"
-                    _hover={{ bg: '#6A28E6' }}
-                    aria-label="Book this move"
-                  >
-                    Book this
-                  </Button>
-                </Link>
-              </VStack>
-            </Box>
-          )}
         </VStack>
       </Container>
     </Box>

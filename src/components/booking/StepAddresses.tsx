@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -17,6 +17,7 @@ import {
   RadioGroup,
   Radio,
   Stack,
+  useToast,
 } from '@chakra-ui/react';
 import type { BookingData } from './BookingWizard';
 
@@ -25,6 +26,7 @@ interface GeocodeResult {
   text: string;
   latitude: number;
   longitude: number;
+  countryCode?: string | null;
 }
 
 interface StepAddressesProps {
@@ -40,6 +42,7 @@ export function StepAddresses({
   onNext,
   isLoading,
 }: StepAddressesProps) {
+  const toast = useToast();
   const [pickupInput, setPickupInput] = useState(data.pickupAddress || '');
   const [dropoffInput, setDropoffInput] = useState(
     data.dropoffAddress || ''
@@ -71,6 +74,33 @@ export function StepAddresses({
     data.dropoffHasLift ?? false
   );
   const [dropoffNotes, setDropoffNotes] = useState(data.dropoffNotes || '');
+
+  // Sync local state when data is prefilled (e.g. from home quote widget → /book?quoteId=xxx)
+  useEffect(() => {
+    if (data.pickupAddress) setPickupInput(data.pickupAddress);
+    if (data.dropoffAddress) setDropoffInput(data.dropoffAddress);
+    if (data.moveSize) setMoveSize(data.moveSize);
+    if (data.pickupFloorNumber !== undefined) setPickupFloorNumber(data.pickupFloorNumber ?? 0);
+    if (data.pickupFlatUnit !== undefined) setPickupFlatUnit(data.pickupFlatUnit || '');
+    if (data.pickupHasLift !== undefined) setPickupHasLift(data.pickupHasLift ?? false);
+    if (data.pickupNotes !== undefined) setPickupNotes(data.pickupNotes || '');
+    if (data.dropoffFloorNumber !== undefined) setDropoffFloorNumber(data.dropoffFloorNumber ?? 0);
+    if (data.dropoffFlatUnit !== undefined) setDropoffFlatUnit(data.dropoffFlatUnit || '');
+    if (data.dropoffHasLift !== undefined) setDropoffHasLift(data.dropoffHasLift ?? false);
+    if (data.dropoffNotes !== undefined) setDropoffNotes(data.dropoffNotes || '');
+  }, [
+    data.pickupAddress,
+    data.dropoffAddress,
+    data.moveSize,
+    data.pickupFloorNumber,
+    data.pickupFlatUnit,
+    data.pickupHasLift,
+    data.pickupNotes,
+    data.dropoffFloorNumber,
+    data.dropoffFlatUnit,
+    data.dropoffHasLift,
+    data.dropoffNotes,
+  ]);
 
   const handleGeocodeSearch = useCallback(
     async (address: string, isPickup: boolean) => {
@@ -108,6 +138,15 @@ export function StepAddresses({
     result: GeocodeResult,
     isPickup: boolean
   ) => {
+    if (result.countryCode && result.countryCode !== 'GB') {
+      toast({
+        title: 'UK addresses only',
+        description: 'Please select an address in the United Kingdom.',
+        status: 'error',
+        isClosable: true,
+      });
+      return;
+    }
     if (isPickup) {
       setPickupInput(result.address);
       setPickupSuggestions([]);
