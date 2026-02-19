@@ -1,0 +1,27 @@
+{
+  "version": "5",
+  "dialect": "pg",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1771449461982,
+      "tag": "0000_mushy_shinobi_shaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1771455000000,
+      "tag": "0001_bookings_floor_flat_lift_notes_customized",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1771458386476,
+      "tag": "0002_dashing_blonde_phantom",
+      "breakpoints": true
+    }
+  ]
+}

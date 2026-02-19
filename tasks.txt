@@ -1,0 +1,367 @@
+# ============================================================
+# COPILOT AGENT MASTER COMMAND — VanItGo
+# Stack: Next.js 15 App Router · Chakra UI v3 · Neon Postgres
+#        Drizzle ORM · TypeScript · Zod · Stripe · NextAuth v5
+# ============================================================
+# RULES (read before anything else)
+# ============================================================
+# - You are an autonomous coding agent. NOT human. Do NOT
+#   click, browse, or guess. Read → Plan → Implement.
+# - Work ONLY inside this repository.
+# - Port 3000. No exceptions.
+# - No duplicate routes. No conflicting API handlers.
+# - No unrelated markdown docs unless explicitly requested.
+# - No "any" types. Strict TypeScript throughout.
+# - Every component must be accessible: ARIA, keyboard focus,
+#   reduced-motion support (prefers-reduced-motion).
+# - Mobile-first. Every layout must work from 320px up.
+# - All env vars must be gated — never expose server secrets
+#   to the client. NEXT_PUBLIC_* for client-safe only.
+# - Zod validation on every API route input.
+# - All DB queries go through Drizzle only. No raw SQL except
+#   where Drizzle cannot express it (document why).
+# - Error boundaries on every page. Loading skeletons on every
+#   async section.
+# - Before creating any file: check if it already exists.
+#   Merge/extend — never overwrite blindly.
+# ============================================================
+
+
+# ============================================================
+# PHASE 0 — COLLECT PROJECT CONFIG (DO NOT SKIP)
+# ============================================================
+# Before writing a single line of code, ask the user for
+# every item below. Do NOT proceed until all are answered.
+# Present them as a numbered checklist. When answered,
+# echo back a 15-bullet summary and ask for confirmation.
+# ============================================================
+
+ASK_USER:
+  1.  RUNTIME
+        - Exact Next.js version (run: npx next --version)
+        - Exact Node.js version (run: node --version)
+        - Package manager: npm / yarn / pnpm / bun
+
+  2.  DATABASE
+        - Neon Postgres connection string (format only — no
+          real secrets here; just confirm pattern)
+        - Pool mode: Session / Transaction / Serverless WS?
+        - Schema naming: snake_case or camelCase tables?
+        - Migration strategy: drizzle-kit push (dev) +
+          drizzle-kit migrate (prod)? Or manual?
+        - Seed strategy: seed script needed for dev?
+
+  3.  AUTHENTICATION
+        - Provider: NextAuth v5 / Clerk / custom JWT / none
+        - Social: Google login? Apple login?
+        - Role system: guest · customer · driver · admin?
+        - Session strategy: JWT or DB sessions?
+        - Protected routes list (e.g., /dashboard, /booking,
+          /admin)
+
+  4.  PAYMENTS
+        - Stripe: yes/no? Account mode: test / live
+        - Features needed:
+            · Instant quote → pay deposit
+            · Price Lock (small fee to freeze a quote)
+            · Full booking payment
+            · Driver payout (Stripe Connect?)
+        - Refund policy rules (partial / full / none)
+        - Currency: GBP only?
+
+  5.  MAPS & DISTANCE
+        - Provider: Google Maps / Mapbox / mock only
+        - APIs to enable: Directions, Distance Matrix,
+          Places Autocomplete, Geocoding
+        - Distance unit: miles (UK default)
+        - ETA computation: Directions API (most accurate)
+          or Distance Matrix?
+
+  6.  AR / DIMENSIONS
+        - MVP approach:
+            A) Manual: user enters rough dimensions + uploads
+               photos (simplest, ship fastest)
+            B) Semi-auto: photo + AI volume estimate
+               (GPT Vision / Gemini)
+            C) Real WebAR: 8th Wall / WebXR (complex, later)
+        - Confirm scope for v1
+
+  7.  CARBON OFFSET
+        - Provider: Ecologi / Tree-Nation / Stripe Climate
+        - Or placeholder widget for MVP?
+        - Per-booking offset amount calculation basis
+          (distance-based CO2 estimate)
+
+  8.  NOTIFICATIONS
+        - Email provider: Resend / SendGrid / Postmark / none
+        - SMS: Twilio / none
+        - Push: none for MVP?
+        - Trigger events: booking confirmed, driver assigned,
+          en route, completed, payment receipt
+
+  9.  BRAND
+        - Primary color (hex)
+        - Secondary / accent color (hex)
+        - Neutral/background color (hex)
+        - Font family (Google Fonts name)
+        - Border radius style: sharp (2px) / soft (8px) /
+          rounded (16px) / pill (9999px)
+        - Shadow intensity: none / subtle / medium / elevated
+        - Animation style: none / subtle / medium / expressive
+        - Logo: SVG provided? Or generate text-based mark?
+
+  10. COPY & CONTENT
+        - Hero headline (exact final text)
+        - Hero subheadline (exact final text)
+        - Trust logos: real brand names or placeholders?
+        - Services list (e.g., House Move, Office Move,
+          Single Item, Student Move, eBay/Marketplace)
+        - UK cities/postcodes source: static JSON bundled
+          or fetched from DB?
+        - FAQ items: provided or AI-generated placeholders?
+
+  11. SEO
+        - Target service keywords (e.g., "man and van London")
+        - Target UK cities (list or "all major cities")
+        - Sitemap: static pages + dynamic city×service pages?
+        - robots.txt rules
+        - OG image strategy: static / dynamic (next/og)
+
+  12. ADMIN REQUIREMENTS
+        - Admin dashboard needed? (booking management,
+          driver management, pricing config, analytics)
+        - Role-based access: admin-only routes?
+        - Audit logs needed?
+
+  13. DRIVER FEATURES
+        - Driver app or web portal?
+        - Driver registration flow (form + doc upload)?
+        - Job acceptance / rejection?
+        - Real-time location sharing (WebSocket / polling)?
+        - Driver earnings dashboard?
+
+  14. ENVIRONMENT & HOSTING
+        - Vercel project: existing or new?
+        - Production domain
+        - Preview branch pattern
+        - Required env vars list and naming conventions
+        - Secrets manager or plain Vercel env vars?
+
+  15. TESTING & QUALITY
+        - Unit tests: Vitest / Jest / none
+        - E2E tests: Playwright / Cypress / none
+        - Minimum accessibility standard: WCAG AA / AAA
+        - Performance budget: Core Web Vitals targets
+        - Error monitoring: Sentry / none
+
+# When user answers all 15, echo back a summary table and
+# ask: "Does this match your intent? Type YES to begin."
+
+
+# ============================================================
+# PHASE 1 — PROJECT VALIDATION & BOOTSTRAP
+# ============================================================
+
+STEP_1_VALIDATE:
+  - Verify Next.js App Router exists at src/app/
+  - Verify tsconfig.json has strict: true
+  - Verify path aliases:
+      @/* → ./src/*
+      @/components/* → ./src/components/*
+      @/lib/* → ./src/lib/*
+      @/types/* → ./src/types/*
+      @/styles/* → ./src/styles/*
+      @/hooks/* → ./src/hooks/*
+      @/server/* → ./src/server/*
+  - Verify Chakra UI v3 provider wraps the root layout
+  - Verify Drizzle config at drizzle.config.ts
+  - Verify .env.local.example exists with all required vars
+  - Add/fix ESLint config: next/core-web-vitals + TypeScript
+    rules. No --no-verify bypasses.
+  - Add Prettier config (.prettierrc) if missing.
+  - Ensure package.json scripts include:
+      "dev": "next dev -p 3000"
+      "build": "next build"
+      "lint": "next lint"
+      "typecheck": "tsc --noEmit"
+      "db:generate": "drizzle-kit generate"
+      "db:migrate": "drizzle-kit migrate"
+      "db:push": "drizzle-kit push"
+      "db:studio": "drizzle-kit studio"
+      "db:seed": "tsx src/lib/db/seed.ts"
+      "test": "vitest"
+      "test:e2e": "playwright test"
+
+
+# ============================================================
+# PHASE 2 — FULL FOLDER STRUCTURE
+# ============================================================
+# Create only what doesn't exist. Never overwrite.
+# ============================================================
+
+FOLDER_STRUCTURE:
+  src/
+    app/
+      # Route groups
+      (marketing)/
+        layout.tsx              # Marketing shell: header + footer
+        page.tsx                # Home page
+        about/page.tsx
+        services/
+          page.tsx              # Services overview
+          [slug]/page.tsx       # Individual service detail
+        cities/
+          [city]/page.tsx       # City landing pages (SEO)
+        blog/
+          page.tsx
+          [slug]/page.tsx
+        pricing/page.tsx
+        faq/page.tsx
+        contact/page.tsx
+
+      (auth)/
+        layout.tsx              # Minimal auth shell (no nav)
+        login/page.tsx
+        register/page.tsx
+        forgot-password/page.tsx
+        reset-password/page.tsx
+        verify-email/page.tsx
+
+      (dashboard)/
+        layout.tsx              # Auth-gated: customer dashboard
+        dashboard/
+          page.tsx              # Overview / stats
+          bookings/
+            page.tsx            # All bookings list
+            [id]/page.tsx       # Booking detail + tracking
+          profile/page.tsx
+          payments/page.tsx
+          notifications/page.tsx
+          settings/page.tsx
+
+      (driver)/
+        layout.tsx              # Auth-gated: driver portal
+        driver/
+          dashboard/page.tsx
+          jobs/
+            page.tsx            # Available + accepted jobs
+            [id]/page.tsx       # Job detail + navigation
+          earnings/page.tsx
+          documents/page.tsx
+          profile/page.tsx
+
+      (admin)/
+        layout.tsx              # Auth-gated: admin only
+        admin/
+          page.tsx              # Admin overview
+          bookings/
+            page.tsx
+            [id]/page.tsx
+          drivers/
+            page.tsx
+            [id]/page.tsx
+          customers/
+            page.tsx
+            [id]/page.tsx
+          pricing/page.tsx      # Pricing rules config
+          content/page.tsx      # CMS-light: copy, FAQs
+          analytics/page.tsx
+          settings/page.tsx
+
+      # Booking flow (multi-step wizard)
+      book/
+        layout.tsx
+        page.tsx                # Step 1: addresses + move size
+        details/page.tsx        # Step 2: items, dimensions, notes
+        schedule/page.tsx       # Step 3: date/time + options
+        drivers/page.tsx        # Step 4: choose driver
+        payment/page.tsx        # Step 5: pay + confirm
+        confirmation/
+          [bookingId]/page.tsx  # Success screen
+
+      # API routes
+      api/
+        health/route.ts
+        auth/[...nextauth]/route.ts
+        pricing/
+          quote/route.ts
+          lock/route.ts         # Price Lock endpoint
+        bookings/
+          route.ts              # GET list / POST create
+          [id]/
+            route.ts            # GET / PATCH / DELETE
+            cancel/route.ts
+            track/route.ts      # Real-time location
+        drivers/
+          route.ts
+          [id]/
+            route.ts
+            assign/route.ts
+            location/route.ts   # Driver posts location
+        payments/
+          checkout/route.ts
+          webhook/route.ts      # Stripe webhook handler
+          refund/route.ts
+        users/
+          route.ts
+          [id]/route.ts
+          me/route.ts
+        notifications/
+          route.ts
+          [id]/read/route.ts
+        upload/route.ts         # File/photo upload handler
+        carbon/estimate/route.ts
+        geocode/route.ts        # Proxy Maps API (hide key)
+        distance/route.ts       # Proxy Distance/Directions API
+        admin/
+          stats/route.ts
+          pricing-rules/route.ts
+          seed/route.ts         # Dev-only seed trigger
+
+      # Special Next.js files
+      layout.tsx                # Root layout
+      not-found.tsx
+      error.tsx
+      loading.tsx
+      sitemap.ts                # Dynamic sitemap
+      robots.ts
+      manifest.ts               # PWA manifest
+
+    components/
+      marketing/
+        Header.tsx
+        MobileMenu.tsx
+        Hero.tsx
+        InstantQuote.tsx
+        QuoteResult.tsx
+        TrustedBy.tsx
+        HowItWorks.tsx
+        ServiceCards.tsx
+        FeaturesGrid.tsx
+        PricingCards.tsx
+        TestimonialsCarousel.tsx
+        CarbonBadge.tsx
+        CityLinks.tsx
+        FAQAccordion.tsx
+        CTABanner.tsx
+        Footer.tsx
+
+      booking/
+        BookingWizard.tsx       # Step controller + progress bar
+        StepAddresses.tsx
+        StepItems.tsx
+        StepSchedule.tsx
+        StepDriverSelect.tsx
+        StepPayment.tsx
+        StepConfirmation.tsx
+        AddressAutocomplete.tsx  (optional)
+
+# --- ENV: Store the following in .env.local only. Never commit real values. ---
+# DATABASE_URL=postgresql://...?sslmode=require
+# GROQ_API_KEY=
+# NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=
+# RESEND_API_KEY=
+# STRIPE_SECRET_KEY=
+# NEXTAUTH_SECRET=
+# NEXT_PUBLIC_APP_URL=http://localhost:3000
+# --- Ensure .gitignore includes .env.local ---
